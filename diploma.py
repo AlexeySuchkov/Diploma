@@ -1,13 +1,14 @@
 import json
 import time
 import requests
+from tqdm import tqdm
 
 
 class UserVk(object):
     id = None
     friends = []
     groups = []
-    Access_Token = '12f6bc7dd84d6c50c2a938b3192ca6c8e82c3d66501499d74ebaf7f4463d4a58ce0f491efa76d9b5f52ca'
+    Access_Token = 'ff2ea1e6996daf5042cff49607eb4644bd690eeeccb6019923210c9c6432bc68e3a254e43f4159ebadf0c'
     version_api = '5.103'
 
     def __init__(self, user_name):
@@ -46,7 +47,7 @@ class GroupVk(object):
     name = ''
     count = 0
     members = []
-    access_token = '12f6bc7dd84d6c50c2a938b3192ca6c8e82c3d66501499d74ebaf7f4463d4a58ce0f491efa76d9b5f52ca'
+    access_token = 'ff2ea1e6996daf5042cff49607eb4644bd690eeeccb6019923210c9c6432bc68e3a254e43f4159ebadf0c'
     version_api = '5.103'
 
     def __init__(self, gid):
@@ -60,6 +61,12 @@ class GroupVk(object):
             'v': self.version_api
         })
         self.members = response.json()['response']['items']
+        first = self.members
+        data = first['items']
+        count = first['count'] // 1000
+        for i in range(1, count + 1):
+            data = data + self.members.append
+
         self.count = response.json()['response']['count']
 
     def get_group_name(self):
@@ -89,22 +96,23 @@ def get_user():
     return user_vk
 
 
-def check_groups_for_friends(user_vk):
+def check_groups_friends(user_vk):
     group_count = len(user_vk.groups)
     print('Количество групп в которых состоит пользователь: {}'.format(group_count))
-    print('Проверяем группы пользователя на наличие друзей:')
-    private_groups = []
-    friends = set(user_vk.friends)
-    for index, gid in enumerate(user_vk.groups):
-        group_vk = GroupVk(gid)
-        time.sleep(0.3)
-        if friends.isdisjoint(group_vk.members):
-            group_vk.get_group_name()
-            time.sleep(0.3)
-            private_groups.append(group_vk)
-        percent_done = int((index + 1) / group_count * 100)
-        print('\r{}%'.format(percent_done), end='')
-    print('')
+    print('Ищем группы друзей:')
+    group_list = []
+    target = user_vk.get_groups()
+    for friend_id in user_vk.friends:
+        friend = UserVk(friend_id)
+        friend.get_groups()  # тут лучше возвращать группы. Метод же называется get
+        print(friend.groups)
+        if friend:
+            for group in tqdm(friend.groups):
+                group_list.append(group)
+                time.sleep(0.1)
+        else:
+            print("Пользователь удалён, заблокирован или включил настройки приватности своего аккаунта.")
+    private_groups = set(target) - set(group_list)
     return private_groups
 
 
@@ -123,7 +131,7 @@ def save_result(private_groups):
 
 def main():
     user_vk = get_user()
-    private_groups = check_groups_for_friends(user_vk)
+    private_groups = check_groups_friends(user_vk)
     if private_groups:
         print('Найдено секретных групп: {}'.format(len(private_groups)))
         save_result(private_groups)

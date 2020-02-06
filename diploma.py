@@ -8,7 +8,7 @@ class UserVk(object):
     id = None
     friends = []
     groups = []
-    Access_Token = 'ff2ea1e6996daf5042cff49607eb4644bd690eeeccb6019923210c9c6432bc68e3a254e43f4159ebadf0c'
+    Access_Token = '26b92fa1d9c283c6a1e3ab21443444f3e8e211d32bfb42216d6a64c9cee970859e4348bc31c6b38317d91'
     version_api = '5.103'
 
     def __init__(self, user_name):
@@ -31,7 +31,12 @@ class UserVk(object):
             'access_token': self.Access_Token,
             'v': self.version_api
         })
-        self.friends = response.json()['response']['items']
+        try:
+            self.friends = response.json()['response']['items']
+        except KeyError:
+            self.friends = 'response'
+        else:
+            return self.friends
 
     def get_groups(self):
         response = requests.get('https://api.vk.com/method/groups.get', {
@@ -39,7 +44,12 @@ class UserVk(object):
             'access_token': self.Access_Token,
             'v': self.version_api
         })
-        self.groups = response.json()['response']['items']
+        try:
+            self.groups = response.json()['response']['items']
+        except KeyError:
+            self.groups = 'response'
+        else:
+            return self.groups
 
 
 class GroupVk(object):
@@ -47,7 +57,7 @@ class GroupVk(object):
     name = ''
     count = 0
     members = []
-    access_token = 'ff2ea1e6996daf5042cff49607eb4644bd690eeeccb6019923210c9c6432bc68e3a254e43f4159ebadf0c'
+    access_token = '26b92fa1d9c283c6a1e3ab21443444f3e8e211d32bfb42216d6a64c9cee970859e4348bc31c6b38317d91'
     version_api = '5.103'
 
     def __init__(self, gid):
@@ -109,7 +119,7 @@ def check_groups_friends(user_vk):
         if friend:
             for group in tqdm(friend.groups):
                 group_list.append(group)
-                time.sleep(0.1)
+                time.sleep(0.34)
         else:
             print("Пользователь удалён, заблокирован или включил настройки приватности своего аккаунта.")
     private_groups = set(target) - set(group_list)

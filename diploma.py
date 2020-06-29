@@ -1,153 +1,160 @@
-import json
-import time
 import requests
-from tqdm import tqdm
+import time
+
+TOKEN = '8a60793fdd7c4b2b39a1ec085f29eca0694708def01d2f4b73502201fa50f4571ed016bc5ea3496e98c8d'
 
 
-class UserVk(object):
-    id = None
-    friends = []
-    groups = []
-    Access_Token = '26b92fa1d9c283c6a1e3ab21443444f3e8e211d32bfb42216d6a64c9cee970859e4348bc31c6b38317d91'
-    version_api = '5.103'
+class UserVK:
 
-    def __init__(self, user_name):
-        response = requests.get('https://api.vk.com/method/users.get', {
-            'user_ids': user_name,
-            'access_token': self.Access_Token,
-            'v': self.version_api
-        })
-        try:
-            self.id = response.json()['response'][0]['id']
-        except KeyError:
-            self.id = None
-        else:
-            self.get_friends()
-            self.get_groups()
+    def __init__(self, token):
+        self.token = token
 
-    def get_friends(self):
-        response = requests.get('https://api.vk.com/method/friends.get', {
-            'user_id': self.id,
-            'access_token': self.Access_Token,
-            'v': self.version_api
-        })
-        try:
-            self.friends = response.json()['response']['items']
-        except KeyError:
-            self.friends = 'response'
-        else:
-            return self.friends
-
-    def get_groups(self):
-        response = requests.get('https://api.vk.com/method/groups.get', {
-            'user_id': self.id,
-            'access_token': self.Access_Token,
-            'v': self.version_api
-        })
-        try:
-            self.groups = response.json()['response']['items']
-        except KeyError:
-            self.groups = 'response'
-        else:
-            return self.groups
-
-
-class GroupVk(object):
-    gid = None
-    name = ''
-    count = 0
-    members = []
-    access_token = '26b92fa1d9c283c6a1e3ab21443444f3e8e211d32bfb42216d6a64c9cee970859e4348bc31c6b38317d91'
-    version_api = '5.103'
-
-    def __init__(self, gid):
-        self.gid = gid
-        self.get_members()
-
-    def get_members(self):
-        response = requests.get('https://api.vk.com/method/groups.getMembers', {
-            'group_id': self.gid,
-            'access_token': self.access_token,
-            'v': self.version_api
-        })
-        self.members = response.json()['response']['items']
-        first = self.members
-        data = first['items']
-        count = first['count'] // 1000
-        for i in range(1, count + 1):
-            data = data + self.members.append
-
-        self.count = response.json()['response']['count']
-
-    def get_group_name(self):
-        response = requests.get('https://api.vk.com/method/groups.getById', {
-            'group_ids': self.gid,
-            'access_token': self.access_token,
-            'v': self.version_api
-        })
-        self.name = response.json()['response'][0]['name']
-
-
-def get_user():
-    while True:
-        user_name = input('Введите имя или id пользователя ВКонтакте: ')
-        user_vk = UserVk(user_name)
-        if user_vk.id:
-            if user_vk.friends and user_vk.groups:
+    def obtain_request(self, url, request_parameters, attempts=1):
+        global json_response
+        response = None
+        if 'access_token' not in request_parameters.keys():
+            request_parameters['access_token'] = self.token
+        for i in range(attempts):
+            try:
+                response = requests.get(url, request_parameters)
+                json_response = response.json()
+                response = json_response['response']
                 break
-            else:
-                if not user_vk.friends:
-                    print('Не найдены друзья пользователя')
-                if not user_vk.groups:
-                    print('Пользователь не состоит в группах')
-        else:
-            print('Ошибка, пользователь с таким именем во ВКонтакте не найден')
-
-    return user_vk
-
-
-def check_groups_friends(user_vk):
-    group_count = len(user_vk.groups)
-    print('Количество групп в которых состоит пользователь: {}'.format(group_count))
-    print('Ищем группы друзей:')
-    group_list = []
-    target = user_vk.get_groups()
-    for friend_id in user_vk.friends:
-        friend = UserVk(friend_id)
-        friend.get_groups()  # тут лучше возвращать группы. Метод же называется get
-        print(friend.groups)
-        if friend:
-            for group in tqdm(friend.groups):
-                group_list.append(group)
+            except KeyError:
+                print("Не удалось получить доступ к профилю, статус: ")
+                if 'error' in json_response.keys():
+                    response = json_response['error']['error_msg']
+                    print(response)
                 time.sleep(0.34)
+        return response
+
+    def get_num_id(self, user_id):
+        if not user_id.isdigit():
+            try:
+                params = {
+                    'v': '5.110',
+                    'user_ids': user_id
+                }
+                id_res = self.obtain_request('https://api.vk.com/method/users.get', params)
+                user_id = int(id_res[0]['id'])
+            except KeyError:
+                print('Пользователь не найден')
+        print('ID пользователя верно')
+        return user_id
+
+    def closed_profile(self, user_id):
+        params = {
+            'v': '5.110',
+            'user_ids': user_id
+        }
+        status = self.obtain_request('https://api.vk.com/method/users.get', params)
+        if_is_closed = status[0]['is_closed']
+
+        return if_is_closed
+
+    def get_user_friends(self, user_id):
+        params = {
+            'user_id': user_id,
+            'v': '5.110'
+        }
+        friends = self.obtain_request('https://api.vk.com/method/friends.get', params)
+        friends_list = friends['items']
+        print('Получен список друга пользователя')
+        return friends_list
+
+    def get_user_groups(self, user_id):
+        params = {
+            'user_id': user_id,
+            'v': '5.110'
+        }
+        user_groups = self.obtain_request('https://api.vk.com/method/groups.get', params)
+        user_groups_list = user_groups['items']
+        groups_count = len(user_groups_list)
+        print('Количество групп в которых состоит пользователь: {}'.format(groups_count))
+        return user_groups_list
+
+    def friends_groups(self, friends_list):
+        global friends_groups_list
+
+        friends_groups_list = []
+        for friend_id in friends_list:
+            active = UserVK(friend_id)
+            params = {
+                'user_id': friend_id,
+                'v': '5.110'
+            }
+            global friends_groups
+            friends_groups = self.obtain_request('https://api.vk.com/method/groups.get', params)
+
+            if active:
+                friends_groups_list.append(friends_groups)
+                time.sleep(0.34)
+            else:
+                pass
+
+            print('Получен список групп друга пользователя')
+        return friends_groups_list
+
+    def exclusive_groups(self, user_groups_list, friends_groups_list):
+
+        private_groups = set(user_groups_list) - set(friends_groups)
+        private_groups_count = len(private_groups)
+        print('Количество приватных групп в которых состоит пользователь: {}'.format(private_groups_count))
+        return private_groups
+
+    def get_groups_info(self, private_groups):
+
+        group_fields = ['name', 'id', 'members_count']
+        groups_string = [str(s) for s in private_groups]
+
+        params = {
+            'group_ids': ','.join(groups_string),
+            'fields': ','.join(group_fields),
+            'v': '5.110'
+        }
+
+        response = self.obtain_request('https://api.vk.com/method/groups.getById', params)
+
+        groups_info = response
+
+        with open('groups.json', 'w', encoding='utf-8') as f:
+            private_groups_list = [
+                '{"name": "%s","gid": "%s","members_count": %d }' % (group['name'], group['id'], group['members_count'])
+                for group in groups_info]
+            f.write(','.join(private_groups_list))
+
+        print('Создан файл groups.json с информацией о группах\n\n')
+        return groups_info
+
+    def api_call(self):
+
+        close_status = self.closed_profile(user_id)
+
+        if close_status == False:
+            friends_list = self.get_user_friends(user_id)
+            user_groups_list = self.get_user_groups(user_id)
+            friends_groups_list = self.friends_groups(friends_list)
+            exclusive_groups_set = self.exclusive_groups(user_groups_list, friends_groups_list)
+            self.get_groups_info(exclusive_groups_set)
         else:
-            print("Пользователь удалён, заблокирован или включил настройки приватности своего аккаунта.")
-    private_groups = set(target) - set(group_list)
-    return private_groups
-
-
-def save_result(private_groups):
-    result = []
-    for group in private_groups:
-        result.append({
-            'name': group.name,
-            'gid': group.gid,
-            'members_count': group.count
-        })
-    with open('groups.json', 'w', encoding="utf-8") as f:
-        json.dump(result, f)
-    print('Результаты поиска записаны в файл')
-
-
-def main():
-    user_vk = get_user()
-    private_groups = check_groups_friends(user_vk)
-    if private_groups:
-        print('Найдено секретных групп: {}'.format(len(private_groups)))
-        save_result(private_groups)
-    else:
-        print('У пользователя нет секретных групп')
+            print('Закрытый аккаунт, информация не доступна')
 
 
 if __name__ == '__main__':
-    main()
+    user = UserVK(TOKEN)
+    while True:
+
+        try:
+            user_id = user.get_num_id(input(
+                'Введите имя или id пользователя ВКонтакте: '))
+        except KeyError:
+            print('Пользователь не найден')
+            user_id = user.get_num_id(input('Введите валидный ID пользователя: '))
+        except IndexError:
+            print('Пользователь не найден')
+            user_id = user.get_num_id(input('Введите валидный ID пользователя: '))
+        except TypeError:
+            print('Пользователь не найден')
+            user_id = user.get_num_id(input('Введите валидный ID пользователя: '))
+        user.api_call()
+        exit()

@@ -93,8 +93,6 @@ class UserVK:
                 friends_groups_list = friends_groups_list + t
                 time.sleep(0.34)
                 print('Получен список групп друга пользователя')
-            #except KeyError:
-            #    print('Пользователь не найден')
 
             except (IndexError, TypeError):
                 print('Пользователь включил приватный статус или заблокирован')

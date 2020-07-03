@@ -1,7 +1,9 @@
+import json
+
 import requests
 import time
 
-TOKEN = '8a60793fdd7c4b2b39a1ec085f29eca0694708def01d2f4b73502201fa50f4571ed016bc5ea3496e98c8d'
+TOKEN = '6a4938a4260601c758dae2590d3b9a6a88f8dad5a25f43f4120c3f8e70600387129f072f419d87b806755'
 
 
 class UserVK:
@@ -20,7 +22,7 @@ class UserVK:
                 json_response = response.json()
                 response = json_response['response']
                 break
-            except KeyError:
+            except (KeyError, TypeError):
                 print("Не удалось получить доступ к профилю, статус: ")
                 if 'error' in json_response.keys():
                     response = json_response['error']['error_msg']
@@ -39,6 +41,7 @@ class UserVK:
                 user_id = int(id_res[0]['id'])
             except KeyError:
                 print('Пользователь не найден')
+
         print('ID пользователя верно')
         return user_id
 
@@ -74,30 +77,33 @@ class UserVK:
         return user_groups_list
 
     def friends_groups(self, friends_list):
-        global friends_groups_list
 
         friends_groups_list = []
+
         for friend_id in friends_list:
-            active = UserVK(friend_id)
-            params = {
-                'user_id': friend_id,
-                'v': '5.110'
-            }
-            global friends_groups
-            friends_groups = self.obtain_request('https://api.vk.com/method/groups.get', params)
-
-            if active:
-                friends_groups_list.append(friends_groups)
+            try:
+                params = {
+                    'user_id': friend_id,
+                    'v': '5.110'
+                }
+                friends_groups = self.obtain_request('https://api.vk.com/method/groups.get', params)
                 time.sleep(0.34)
-            else:
-                pass
+                t = friends_groups['items']
 
-            print('Получен список групп друга пользователя')
+                friends_groups_list = friends_groups_list + t
+                time.sleep(0.34)
+                print('Получен список групп друга пользователя')
+            #except KeyError:
+            #    print('Пользователь не найден')
+
+            except (IndexError, TypeError):
+                print('Пользователь включил приватный статус или заблокирован')
+
         return friends_groups_list
 
     def exclusive_groups(self, user_groups_list, friends_groups_list):
 
-        private_groups = set(user_groups_list) - set(friends_groups)
+        private_groups = set(user_groups_list) - set(friends_groups_list)
         private_groups_count = len(private_groups)
         print('Количество приватных групп в которых состоит пользователь: {}'.format(private_groups_count))
         return private_groups
@@ -116,12 +122,17 @@ class UserVK:
         response = self.obtain_request('https://api.vk.com/method/groups.getById', params)
 
         groups_info = response
+        result = []
 
-        with open('groups.json', 'w', encoding='utf-8') as f:
-            private_groups_list = [
-                '{"name": "%s","gid": "%s","members_count": %d }' % (group['name'], group['id'], group['members_count'])
-                for group in groups_info]
-            f.write(','.join(private_groups_list))
+        for group in groups_info:
+            result.append({
+                'name': group['name'],
+                'gid': group['id'],
+                'members_count': group['members_count']
+            })
+
+            with open('groups.json', 'w', encoding='utf-8') as f:
+                json.dump(result, f, sort_keys=False, indent=3, ensure_ascii=False, separators=(',', ':'))
 
         print('Создан файл groups.json с информацией о группах\n\n')
         return groups_info
@@ -130,7 +141,7 @@ class UserVK:
 
         close_status = self.closed_profile(user_id)
 
-        if close_status == False:
+        if not close_status:
             friends_list = self.get_user_friends(user_id)
             user_groups_list = self.get_user_groups(user_id)
             friends_groups_list = self.friends_groups(friends_list)
